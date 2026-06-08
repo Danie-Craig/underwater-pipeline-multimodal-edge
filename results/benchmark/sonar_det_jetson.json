@@ -1,0 +1,22 @@
+{
+  "model": "sonar_det",
+  "task": "detect",
+  "device": "Jetson AGX Orin (JetPack, TensorRT via trtexec)",
+  "imgsz": 1024,
+  "batch": 1,
+  "runs": [
+    {
+      "precision": "fp32",
+      "throughput_qps": 53.82,
+      "gpu_compute_ms": {"mean": 18.515, "p95": 18.535, "p99": 18.549},
+      "end_to_end_latency_ms": {"mean": 19.701, "p99": 19.739}
+    },
+    {
+      "precision": "fp16",
+      "throughput_qps": 91.25,
+      "gpu_compute_ms": {"mean": 10.918, "p95": 10.933, "p99": 10.942},
+      "end_to_end_latency_ms": {"mean": 12.155, "p99": 12.185}
+    }
+  ],
+  "fp16_speedup_vs_fp32": {"gpu_compute": 1.70, "throughput": 1.70}
+}

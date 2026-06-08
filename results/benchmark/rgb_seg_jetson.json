@@ -1,0 +1,22 @@
+{
+  "model": "rgb_seg",
+  "task": "segment",
+  "device": "Jetson AGX Orin (JetPack, TensorRT via trtexec)",
+  "imgsz": 1024,
+  "batch": 1,
+  "runs": [
+    {
+      "precision": "fp32",
+      "throughput_qps": 43.26,
+      "gpu_compute_ms": {"mean": 23.032, "p95": 23.055, "p99": 23.088},
+      "end_to_end_latency_ms": {"mean": 25.286, "p99": 25.341}
+    },
+    {
+      "precision": "fp16",
+      "throughput_qps": 75.30,
+      "gpu_compute_ms": {"mean": 13.231, "p95": 13.249, "p99": 13.256},
+      "end_to_end_latency_ms": {"mean": 15.604, "p99": 15.636}
+    }
+  ],
+  "fp16_speedup_vs_fp32": {"gpu_compute": 1.74, "throughput": 1.74}
+}
