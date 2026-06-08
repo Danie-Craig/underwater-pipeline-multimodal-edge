@@ -26,6 +26,9 @@ data/
 models/onnx/
 models/trt_cache/
 
+# ─── Ultralytics training output (heavy; key plots are copied to results/) ──
+runs/
+
 # ─── Results ──────────────────────────────────────────────────────────────
 # Keep the small, portfolio-worthy artifacts (JSON tables, PNG plots) tracked.
 # Exclude large binaries — host the demo video externally or use git-lfs.

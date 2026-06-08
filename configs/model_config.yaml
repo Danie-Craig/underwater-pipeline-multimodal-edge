@@ -31,6 +31,23 @@ models:
     conf: 0.25
     iou: 0.50
 
+# ─── Baseline training (§13 step 3) ──────────────────────────────────────────
+# Fine-tune the two YOLO11-nano models from COCO-pretrained weights on the
+# SubPipe datasets built in step 2, then record clean (undegraded) validation
+# metrics. Driven by scripts/train.py.
+training:
+  epochs: 100
+  patience: 20             # early-stop after N epochs with no val improvement
+  batch: 16
+  device: 0                # GPU index on the Thunder VM
+  workers: 8
+  seed: 0
+  pretrained: true         # start from COCO-pretrained yolo11n / yolo11n-seg
+  rgb_imgsz: 1024          # RGB frames are 2704x1520
+  sonar_imgsz: 1024        # sonar waterfalls are very wide (5000x500 / 2500x500)
+  runs_dir: runs           # Ultralytics output dir (gitignored)
+  results_dir: results/baselines   # clean-metrics JSON + key plots (tracked)
+
 # ─── Edge optimization (§7) ──────────────────────────────────────────────────
 optimization:
   onnx_opset: 17
@@ -115,7 +132,7 @@ data:
   # sonar+detection data — so the two modalities live under different roots.
   # Point these at wherever the archives unzipped (auto-discovery walks them).
   rgb_root: data/subpipe/SubPipeMini      # segmentation + RGB camera
-  sonar_root: data/subpipe/SubPipeMiniSSS # side-scan sonar + detection boxes
+  sonar_root: data/subpipe/SubPipeMiniSSS   # side-scan sonar + detection boxes
   sync_tolerance_s: 0.5        # max |Δt| to attach an RGB/sonar frame to a tick
   # Ultralytics dataset YAMLs are generated from the raw SubPipe layout in
   # roadmap step 2 (see src/data/loaders.py / scripts/prepare_data.py).
