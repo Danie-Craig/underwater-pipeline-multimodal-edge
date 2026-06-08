@@ -10,8 +10,9 @@ venv/
 env/
 
 # ─── Data (never committed — pulled per machine; see README) ──────────────
-data/
-!data/subpipe/.gitkeep
+# Datasets (downloaded / generated). Anchored to repo root with a leading
+# slash so this does NOT also match the src/data/ source package.
+/data/
 
 # ─── Model artifacts (heavy / machine-specific — see §7, §11) ─────────────
 # Trained weights, ONNX exports, and TensorRT engines are all regenerated,
