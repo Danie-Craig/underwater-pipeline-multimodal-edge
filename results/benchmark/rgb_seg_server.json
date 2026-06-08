@@ -1,0 +1,19 @@
+[
+  {
+    "name": "pytorch",
+    "iters": 500,
+    "latency_ms_avg": 35.78948353137821,
+    "latency_ms_std": 9.208612541926469,
+    "latency_ms_min": 23.70009897276759,
+    "fps": 27.941168782814543,
+    "percentiles_ms": {
+      "95": 50.69680553860962,
+      "99": 65.44226724654433
+    },
+    "speedup_vs_baseline": 1.0,
+    "meta": {
+      "model": "rgb_seg",
+      "tag": "server"
+    }
+  }
+]
