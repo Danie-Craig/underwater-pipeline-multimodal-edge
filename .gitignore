@@ -1,0 +1,41 @@
+# ─── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# ─── Virtual environments ─────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ─── Data (never committed — pulled per machine; see README) ──────────────
+data/
+!data/subpipe/.gitkeep
+
+# ─── Model artifacts (heavy / machine-specific — see §7, §11) ─────────────
+# Trained weights, ONNX exports, and TensorRT engines are all regenerated,
+# not version-controlled. TensorRT engines are GPU- + version-specific and
+# MUST be built on the Jetson itself, so they never belong in git.
+*.pt
+*.pth
+*.onnx
+*.engine
+*.plan
+*.trt
+models/onnx/
+models/trt_cache/
+
+# ─── Results ──────────────────────────────────────────────────────────────
+# Keep the small, portfolio-worthy artifacts (JSON tables, PNG plots) tracked.
+# Exclude large binaries — host the demo video externally or use git-lfs.
+*.mp4
+*.avi
+*.mov
+
+# ─── OS / editor cruft ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,48 @@
+# ============================================================================
+#  Thunder Compute VM — training + development dependencies  (§11A, §15)
+# ============================================================================
+#  This is the CLOUD-GPU / server side: train + fine-tune both YOLO11 models,
+#  run the augmentation + robustness pipeline, and export to ONNX.
+#
+#  Install (Linux, NVIDIA GPU, Python 3.10+), inside a venv:
+#      python -m venv .venv && source .venv/bin/activate
+#      pip install --upgrade pip
+#      pip install -r requirements.txt
+#      python scripts/verify_setup.py        # confirms CUDA + all imports
+#
+#  Versions are pinned to lower bounds for portability across CUDA/driver
+#  combos. After your first clean install, freeze exact versions for
+#  reproducibility:   pip freeze > requirements.lock.txt
+#
+#  NOTE on PyTorch: `pip install torch` ships CUDA wheels by default on Linux.
+#  If your CUDA/driver needs a specific build, follow https://pytorch.org
+#  and install torch/torchvision FIRST, then the rest of this file.
+#
+#  NOTE on ONNX Runtime: install onnxruntime-GPU (CUDA execution provider) for
+#  the server-side benchmark. Do NOT also install plain `onnxruntime` — having
+#  both in one env causes provider conflicts. (The Jetson uses a different,
+#  Jetson-specific wheel — see requirements-jetson.txt.)
+# ----------------------------------------------------------------------------
+
+# --- Models / training -----------------------------------------------------
+torch>=2.2
+torchvision>=0.17
+ultralytics>=8.3            # YOLO11 (-seg for RGB, detect for sonar)
+
+# --- Optimization / export (server side) -----------------------------------
+onnx>=1.16
+onnxruntime-gpu>=1.18       # CUDA execution provider for the ONNX benchmark
+onnxslim>=0.1               # graph simplification used by Ultralytics export
+
+# --- CV / data / tracking --------------------------------------------------
+opencv-python>=4.9
+numpy>=1.26,<2.0            # <2.0 avoids ABI breaks with some prebuilt wheels
+scipy>=1.11
+filterpy>=1.4.5            # Kalman filter for the fused pipe track (§6)
+pandas>=2.1               # benchmark / robustness tables
+matplotlib>=3.8           # plots and figures
+
+# --- Config / utilities ----------------------------------------------------
+PyYAML>=6.0               # configs/model_config.yaml
+tqdm>=4.66                # progress bars for training / sweeps
+Pillow>=10.0

@@ -1,0 +1,56 @@
+# ============================================================================
+#  Jetson AGX Orin — edge INFERENCE dependencies  (§7, §11C, §15)
+# ============================================================================
+#  This is the EDGE side: git clone the repo, copy the exported .onnx over,
+#  BUILD the TensorRT engine on-device, then run the edge benchmark + the
+#  robustness inference. Target: JetPack 6.x, TensorRT 10.x, CUDA 12.6.
+#
+#  Confirm the exact on-device versions first — the Jetson wheels are tied to
+#  the JetPack version:
+#      cat /etc/nv_tegra_release        # JetPack / L4T version
+#      python3 -c "import tensorrt as trt; print(trt.__version__)"
+#
+# ----------------------------------------------------------------------------
+#  ⚠️  DO NOT `pip install` these — they come from the system / NVIDIA:
+#
+#   • tensorrt        → ships with JetPack. It is already on the device under
+#                       the system Python. Use the system interpreter (or a
+#                       venv created with `--system-site-packages`) so `import
+#                       tensorrt` resolves. Never pip-install it on Jetson.
+#
+#   • onnxruntime-gpu → the PyPI wheel is NOT built for Jetson/aarch64+CUDA.
+#                       Install the Jetson-specific wheel from the NVIDIA
+#                       "Jetson Zoo" matching your JetPack version, e.g.:
+#                         pip install <onnxruntime_gpu-*-cp310-...aarch64.whl>
+#                       (download from the Jetson Zoo ONNX Runtime page).
+#
+#   • torch / torchvision → OPTIONAL on Jetson, only for a PyTorch baseline on
+#                       the device. If you want it, install NVIDIA's Jetson
+#                       wheel — the generic PyPI wheel will not use the GPU.
+#
+#  Recommended venv on Jetson (so system tensorrt stays importable):
+#      python3 -m venv --system-site-packages .venv
+#      source .venv/bin/activate
+#      pip install --upgrade pip
+#      pip install -r requirements-jetson.txt
+#      # then install the Jetson onnxruntime-gpu wheel as above
+#      python scripts/verify_setup.py
+# ----------------------------------------------------------------------------
+
+# --- Pure-Python / portable deps (safe to pip install on Jetson) -----------
+numpy>=1.26,<2.0
+scipy>=1.11
+filterpy>=1.4.5
+pandas>=2.1
+matplotlib>=3.8
+PyYAML>=6.0
+tqdm>=4.66
+pycuda>=2024.1            # host<->device buffer mgmt for the TensorRT runner
+
+# --- OpenCV ----------------------------------------------------------------
+# JetPack often ships OpenCV (sometimes CUDA-enabled) system-wide. If `import
+# cv2` already works under the system Python, omit this and use
+# --system-site-packages. Otherwise, uncomment:
+# opencv-python>=4.9
+
+# --- NOT pip-installed (see header): tensorrt, onnxruntime-gpu, torch ------

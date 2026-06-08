@@ -1,0 +1,117 @@
+# ============================================================================
+#  model_config.yaml — single source of truth for the pipeline
+#  Referenced by every script in scripts/ and loaded via src/ utilities.
+#  Paths are relative to the repository root.
+# ============================================================================
+
+project:
+  name: underwater-pipeline-multimodal-edge
+  seed: 1337
+  # Inference image sizes (square, multiples of 32 for YOLO).
+  rgb_imgsz: 640
+  sonar_imgsz: 640
+
+# ─── Models (§5) ────────────────────────────────────────────────────────────
+models:
+  rgb_seg:
+    task: segment
+    arch: yolo11n-seg          # nano; swap to yolo11s-seg if accuracy needs it
+    weights: models/yolo11n-seg-subpipe.pt     # produced in roadmap step 3
+    onnx:    models/onnx/rgb_seg.onnx           # produced in step 4
+    engine:  models/trt_cache/rgb_seg_fp16.engine  # BUILT ON JETSON (step 4)
+    conf: 0.25                 # confidence threshold
+    iou: 0.50                  # NMS IoU threshold
+
+  sonar_det:
+    task: detect
+    arch: yolo11n              # nano detector for side-scan sonar
+    weights: models/yolo11n-subpipe-sonar.pt
+    onnx:    models/onnx/sonar_det.onnx
+    engine:  models/trt_cache/sonar_det_fp16.engine
+    conf: 0.25
+    iou: 0.50
+
+# ─── Edge optimization (§7) ──────────────────────────────────────────────────
+optimization:
+  onnx_opset: 17
+  dynamic_batch: false         # fixed batch=1 for lowest edge latency
+  precision: fp16              # headline; "int8" is the calibrated stretch goal
+  workspace_gib: 4             # TensorRT builder workspace
+  int8_calib_images: 200       # used only when precision == int8
+
+benchmark:                     # §7 timing harness (src/optimization/benchmark.py)
+  warmup_iters: 50
+  measure_iters: 500
+  percentiles: [95, 99]
+
+# ─── Fusion + Kalman tracker (§6) ────────────────────────────────────────────
+# Fusion is along the AUV's INS-derived trajectory, NOT pixel-to-pixel.
+# The track state is the pipe's along-track position + heading.
+fusion:
+  # A modality only contributes a measurement when its detection clears this.
+  rgb_measurement_conf: 0.40
+  sonar_measurement_conf: 0.40
+  # Cross-modal gating (§10.4): a confident detection in one modality can
+  # confirm / recover a weak detection in the other.
+  cross_modal_gating: true
+  gate_distance_m: 1.5         # Mahalanobis-style spatial gate for association
+  max_coast_frames: 30         # how long the track may coast with no update
+
+kalman:
+  # State: [along_track_pos, along_track_vel, heading, heading_rate]
+  dt: 0.1                      # nominal timestep (s); overridden by INS stamps
+  process_noise_pos: 0.05      # Q — position
+  process_noise_heading: 0.02  # Q — heading
+  meas_noise_rgb_pos: 0.10     # R — RGB position measurement
+  meas_noise_sonar_pos: 0.25   # R — sonar position measurement (lower-res)
+
+# ─── Degraded-frame filtering / quality gates (§8, §10.2) ────────────────────
+# Frames worse than these thresholds are skipped; the track coasts or the
+# other modality carries. Thresholds are starting points — calibrate on data.
+quality_gates:
+  rgb:
+    laplacian_var_min: 100.0   # blur gate: lower variance ⇒ blurrier ⇒ skip
+    dark_channel_max: 0.65     # haze/turbidity gate via dark-channel prior
+    brightness_min: 25         # low-light gate (mean luma, 0–255)
+    brightness_max: 230        # overexposure gate
+  sonar:
+    snr_min: 3.0               # signal-to-noise gate (dB)
+    contrast_min: 0.10         # RMS-contrast gate
+
+# ─── Robustness sweep (§8) ───────────────────────────────────────────────────
+# Conditions implemented in src/data/augmentations.py. Each runs at the
+# severity levels below; results land in results/robustness/.
+robustness:
+  severities: [0.25, 0.50, 0.75, 1.0]
+  rgb_conditions:
+    - turbidity_haze
+    - color_attenuation        # Beer-Lambert, depth-dependent blue-green shift
+    - low_light
+    - motion_blur
+    - gaussian_noise
+    - overexposure
+    - backscatter              # "marine snow" particulates
+    - sand_occlusion
+  sonar_conditions:
+    - speckle_noise            # multiplicative
+    - beam_dropout             # low-SNR return loss
+    - range_falloff            # range-dependent intensity falloff
+    - motion_smear
+    - reverberation_clutter
+
+# ─── Simulated shutter-speed what-if (§10.5) ─────────────────────────────────
+# Motion-blur kernel scales with exposure_time × vehicle_velocity. A faster
+# shutter ⇒ smaller kernel. We sweep the kernel-scale factor and report the
+# predicted detection-rate recovery (no hardware required).
+shutter_sim:
+  baseline_blur_kernel: 15     # px, at the dataset's nominal exposure
+  faster_shutter_factors: [1.0, 0.5, 0.25, 0.1]   # ×kernel size
+
+# ─── Data (§3) ───────────────────────────────────────────────────────────────
+data:
+  root: data/subpipe
+  use_mini: true               # SubPipeMini (~20%) for fast iteration
+  # Ultralytics dataset YAMLs are generated from the raw SubPipe layout in
+  # roadmap step 2 (see src/data/loaders.py).
+  rgb_dataset_yaml: data/subpipe/rgb_seg.yaml
+  sonar_dataset_yaml: data/subpipe/sonar_det.yaml
