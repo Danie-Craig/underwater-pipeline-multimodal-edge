@@ -1,0 +1,132 @@
+{
+  "modality": "sonar",
+  "task": "detect",
+  "imgsz": 1024,
+  "metric": "box mAP50",
+  "clean": {
+    "map50": 0.9946825196850393,
+    "map50_95": 0.778401300404825
+  },
+  "grid": [
+    {
+      "condition": "speckle_noise",
+      "severity": 0.25,
+      "map50": 0.9949206349206349,
+      "map50_95": 0.7754807822728594
+    },
+    {
+      "condition": "speckle_noise",
+      "severity": 0.5,
+      "map50": 0.9923891942752439,
+      "map50_95": 0.7685595767700361
+    },
+    {
+      "condition": "speckle_noise",
+      "severity": 0.75,
+      "map50": 0.9825472077139413,
+      "map50_95": 0.7475610598211336
+    },
+    {
+      "condition": "speckle_noise",
+      "severity": 1.0,
+      "map50": 0.972425146725433,
+      "map50_95": 0.7150286978553433
+    },
+    {
+      "condition": "beam_dropout",
+      "severity": 0.25,
+      "map50": 0.9570830043481727,
+      "map50_95": 0.6528795818190669
+    },
+    {
+      "condition": "beam_dropout",
+      "severity": 0.5,
+      "map50": 0.8453174115472444,
+      "map50_95": 0.44474553537082995
+    },
+    {
+      "condition": "beam_dropout",
+      "severity": 0.75,
+      "map50": 0.7503058509939287,
+      "map50_95": 0.27835798306091236
+    },
+    {
+      "condition": "beam_dropout",
+      "severity": 1.0,
+      "map50": 0.6961421770762852,
+      "map50_95": 0.2123361442424181
+    },
+    {
+      "condition": "range_falloff",
+      "severity": 0.25,
+      "map50": 0.995,
+      "map50_95": 0.7792401764436642
+    },
+    {
+      "condition": "range_falloff",
+      "severity": 0.5,
+      "map50": 0.995,
+      "map50_95": 0.7810734763273375
+    },
+    {
+      "condition": "range_falloff",
+      "severity": 0.75,
+      "map50": 0.994765625,
+      "map50_95": 0.7715883852196339
+    },
+    {
+      "condition": "range_falloff",
+      "severity": 1.0,
+      "map50": 0.9846037795275591,
+      "map50_95": 0.7554865387415303
+    },
+    {
+      "condition": "motion_smear",
+      "severity": 0.25,
+      "map50": 0.9949212598425198,
+      "map50_95": 0.7666948586467683
+    },
+    {
+      "condition": "motion_smear",
+      "severity": 0.5,
+      "map50": 0.9932671808881033,
+      "map50_95": 0.7209486849630565
+    },
+    {
+      "condition": "motion_smear",
+      "severity": 0.75,
+      "map50": 0.965,
+      "map50_95": 0.6817039449200253
+    },
+    {
+      "condition": "motion_smear",
+      "severity": 1.0,
+      "map50": 0.9641666666666666,
+      "map50_95": 0.6464204508168587
+    },
+    {
+      "condition": "reverberation_clutter",
+      "severity": 0.25,
+      "map50": 0.9694775750077327,
+      "map50_95": 0.7089401275794814
+    },
+    {
+      "condition": "reverberation_clutter",
+      "severity": 0.5,
+      "map50": 0.9262832079683433,
+      "map50_95": 0.6249326979651363
+    },
+    {
+      "condition": "reverberation_clutter",
+      "severity": 0.75,
+      "map50": 0.8608698669104196,
+      "map50_95": 0.551720594547764
+    },
+    {
+      "condition": "reverberation_clutter",
+      "severity": 1.0,
+      "map50": 0.8100482968983327,
+      "map50_95": 0.5035790254486537
+    }
+  ]
+}
