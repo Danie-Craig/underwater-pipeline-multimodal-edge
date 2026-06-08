@@ -35,7 +35,7 @@ onnxruntime-gpu>=1.18       # CUDA execution provider for the ONNX benchmark
 onnxslim>=0.1               # graph simplification used by Ultralytics export
 
 # --- CV / data / tracking --------------------------------------------------
-opencv-python>=4.9
+opencv-python-headless>=4.9
 numpy>=1.26,<2.0            # <2.0 avoids ABI breaks with some prebuilt wheels
 scipy>=1.11
 filterpy>=1.4.5            # Kalman filter for the fused pipe track (§6)
