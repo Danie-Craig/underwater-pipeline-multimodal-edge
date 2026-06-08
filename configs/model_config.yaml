@@ -115,7 +115,7 @@ data:
   # sonar+detection data — so the two modalities live under different roots.
   # Point these at wherever the archives unzipped (auto-discovery walks them).
   rgb_root: data/subpipe/SubPipeMini      # segmentation + RGB camera
-  sonar_root: data/subpipe/SubPipeMini2   # side-scan sonar + detection boxes
+  sonar_root: data/subpipe/SubPipeMiniSSS # side-scan sonar + detection boxes
   sync_tolerance_s: 0.5        # max |Δt| to attach an RGB/sonar frame to a tick
   # Ultralytics dataset YAMLs are generated from the raw SubPipe layout in
   # roadmap step 2 (see src/data/loaders.py / scripts/prepare_data.py).
