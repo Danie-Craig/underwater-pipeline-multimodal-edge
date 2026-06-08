@@ -8,8 +8,8 @@ project:
   name: underwater-pipeline-multimodal-edge
   seed: 1337
   # Inference image sizes (square, multiples of 32 for YOLO).
-  rgb_imgsz: 640
-  sonar_imgsz: 640
+  rgb_imgsz: 1024          # match training (step 3 trained at 1024)
+  sonar_imgsz: 1024
 
 # ─── Models (§5) ────────────────────────────────────────────────────────────
 models:

@@ -88,13 +88,36 @@ class SonarDetector:
     def infer(self, frame: np.ndarray) -> DetResult:
         """Run detection on a single sonar frame and return a :class:`DetResult`.
 
-        TODO(step 3/4): finalize post-processing for each backend —
-          • Ultralytics backends: read ``results[0].boxes`` (xyxy + conf),
-            filter by ``self.conf``, and wrap each as a :class:`Detection`.
-          • ``trt`` backend: decode raw engine output (boxes + scores) and run
-            NMS at ``self.iou`` here.
-        Time only the forward pass (exclude pre/post) for a clean §7 benchmark.
+        Ultralytics backends (pytorch / onnx / engine) run through ``predict``
+        and each kept box becomes a :class:`Detection` (xyxy already in
+        original-image pixels). The raw ``trt`` backend is timed for the
+        benchmark; its box decode + NMS are finalized on-device.
         """
-        raise NotImplementedError(
-            "SonarDetector.infer is a scaffold — implemented in roadmap step 3/4."
+        import time
+
+        if self.backend == "trt":
+            t0 = time.perf_counter()
+            raw = self._model.infer(frame)
+            return DetResult(latency_ms=(time.perf_counter() - t0) * 1000.0,
+                             extra={"raw_output": raw})
+
+        t0 = time.perf_counter()
+        results = self._model.predict(
+            frame, imgsz=self.imgsz, conf=self.conf, iou=self.iou,
+            device=self.device, verbose=False,
         )
+        dt = (time.perf_counter() - t0) * 1000.0
+
+        r = results[0]
+        boxes = getattr(r, "boxes", None)
+        dets: list[Detection] = []
+        if boxes is not None and len(boxes):
+            xyxy = boxes.xyxy.cpu().numpy()
+            confs = boxes.conf.cpu().numpy()
+            clss = boxes.cls.cpu().numpy().astype(int)
+            for (x1, y1, x2, y2), c, k in zip(xyxy, confs, clss):
+                dets.append(Detection(
+                    xyxy=(float(x1), float(y1), float(x2), float(y2)),
+                    score=float(c), cls=int(k),
+                ))
+        return DetResult(detections=dets, latency_ms=dt)

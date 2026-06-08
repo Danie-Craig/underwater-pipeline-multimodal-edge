@@ -90,15 +90,43 @@ class RGBSegmenter:
     def infer(self, frame: np.ndarray) -> SegResult:
         """Run segmentation on a single BGR frame and return a :class:`SegResult`.
 
-        TODO(step 3/4): finalize post-processing for each backend —
-          • Ultralytics backends: pull ``results[0].masks`` + the top score,
-            threshold by ``self.conf``, union instance masks into one pipe
-            mask, and compute its centroid.
-          • ``trt`` backend: decode the raw engine output tensors (proto +
-            mask coeffs for YOLO-seg) into a binary mask here.
-        Keep timing around the forward pass only (exclude pre/post) so the
-        benchmark in §7 measures the model, not the Python overhead.
+        Ultralytics backends (pytorch / onnx / engine) run through ``predict``;
+        we union the instance masks into one pipe mask, take the top score, and
+        read the best box centre (already in original-image pixels) as the
+        centroid the fusion stage projects along-track. The raw ``trt`` backend
+        is timed for the benchmark; its mask decode is finalized on-device.
         """
-        raise NotImplementedError(
-            "RGBSegmenter.infer is a scaffold — implemented in roadmap step 3/4."
+        import time
+
+        if self.backend == "trt":
+            t0 = time.perf_counter()
+            raw = self._model.infer(frame)
+            return SegResult(latency_ms=(time.perf_counter() - t0) * 1000.0,
+                             extra={"raw_output": raw})
+
+        t0 = time.perf_counter()
+        results = self._model.predict(
+            frame, imgsz=self.imgsz, conf=self.conf, iou=self.iou,
+            device=self.device, verbose=False,
         )
+        dt = (time.perf_counter() - t0) * 1000.0
+
+        r = results[0]
+        boxes = getattr(r, "boxes", None)
+        masks = getattr(r, "masks", None)
+        if boxes is None or len(boxes) == 0:
+            return SegResult(present=False, score=0.0, mask=None, centroid=None, latency_ms=dt)
+
+        conf = boxes.conf.cpu().numpy()
+        best = int(conf.argmax())
+        score = float(conf[best])
+        x1, y1, x2, y2 = (float(v) for v in boxes.xyxy[best].cpu().numpy())
+        centroid = (0.5 * (x1 + x2), 0.5 * (y1 + y2))
+
+        mask = None
+        if masks is not None and masks.data is not None and len(masks.data):
+            m = masks.data.cpu().numpy()
+            mask = (m.sum(axis=0) > 0).astype(np.uint8)   # union → single pipe mask
+
+        return SegResult(present=True, score=score, mask=mask,
+                         centroid=centroid, latency_ms=dt)

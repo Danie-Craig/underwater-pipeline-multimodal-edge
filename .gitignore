@@ -20,10 +20,13 @@ data/
 *.pt
 *.pth
 *.onnx
+# Exception: the small ONNX exports ARE committed — they are the
+# architecture-neutral bridge to the Jetson (engines are still built
+# on-device from these, and are never committed).
+!models/onnx/*.onnx
 *.engine
 *.plan
 *.trt
-models/onnx/
 models/trt_cache/
 
 # ─── Ultralytics training output (heavy; key plots are copied to results/) ──

@@ -45,7 +45,7 @@ def make_runner(model_key: str, backend: str, cfg: dict):
         from src.inference.rgb_segmenter import RGBSegmenter
         from src.inference.sonar_detector import SonarDetector
 
-        weights = m["engine"] if backend == "engine" else m["weights"]
+        weights = {"pytorch": m["weights"], "onnx": m["onnx"], "engine": m["engine"]}[backend]
         cls = RGBSegmenter if m["task"] == "segment" else SonarDetector
         model = cls(weights, backend=backend, conf=m["conf"], iou=m["iou"], imgsz=imgsz)
         sync = None
