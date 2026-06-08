@@ -109,9 +109,22 @@ shutter_sim:
 
 # ─── Data (§3) ───────────────────────────────────────────────────────────────
 data:
-  root: data/subpipe
+  root: data/subpipe           # base dir holding the downloaded dataset(s)
   use_mini: true               # SubPipeMini (~20%) for fast iteration
+  # SubPipeMini carries the segmentation+camera data; SubPipeMini2 carries the
+  # sonar+detection data — so the two modalities live under different roots.
+  # Point these at wherever the archives unzipped (auto-discovery walks them).
+  rgb_root: data/subpipe/SubPipeMini      # segmentation + RGB camera
+  sonar_root: data/subpipe/SubPipeMini2   # side-scan sonar + detection boxes
+  sync_tolerance_s: 0.5        # max |Δt| to attach an RGB/sonar frame to a tick
   # Ultralytics dataset YAMLs are generated from the raw SubPipe layout in
-  # roadmap step 2 (see src/data/loaders.py).
+  # roadmap step 2 (see src/data/loaders.py / scripts/prepare_data.py).
   rgb_dataset_yaml: data/subpipe/rgb_seg.yaml
   sonar_dataset_yaml: data/subpipe/sonar_det.yaml
+  prep:
+    out_dir: data/subpipe/yolo  # converted YOLO datasets are written here
+    val_fraction: 0.2           # seeded train/val split
+    seed: 42
+    sonar_freq: HF              # HF (5000x500) or LF (2500x500)
+    min_polygon_area_px: 50     # drop tiny contour noise when tracing masks
+    copy_images: false          # symlink images (fast); true = copy
