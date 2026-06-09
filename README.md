@@ -32,11 +32,6 @@ inference time.
   </tr>
 </table>
 
-<sub>To embed: drag <code>results/inference/rgb_demo.mp4</code> and
-<code>sonar_demo.mp4</code> into any GitHub comment to generate asset URLs, then
-paste them into the two <code>src</code> fields above. The fused RGB+sonar demo is
-in progress.</sub>
-
 ## Edge performance (Jetson AGX Orin, TensorRT FP16)
 
 > **Device**: NVIDIA Jetson AGX Orin · **Precision**: FP16 · exported via ONNX,
