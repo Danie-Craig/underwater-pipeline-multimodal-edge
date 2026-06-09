@@ -41,7 +41,7 @@ def _u8(img: np.ndarray) -> np.ndarray:
 # ============================================================================
 def turbidity_haze(img: np.ndarray, severity: float) -> np.ndarray:
     """Scattering haze via an airlight model: I = J·t + A·(1−t)."""
-    t = float(np.exp(-3.0 * severity))            # transmission falls with severity
+    t = float(np.exp(-1.5 * severity))            # transmission falls with severity
     airlight = np.array([170, 178, 150], np.float32)  # blue-green-ish veiling light
     out = _f32(img) * t + airlight * (1.0 - t)
     return _u8(out)
@@ -63,8 +63,10 @@ def low_light(img: np.ndarray, severity: float) -> np.ndarray:
 
 
 def motion_blur(img: np.ndarray, severity: float, angle_deg: float = 0.0) -> np.ndarray:
-    """Linear motion blur; kernel length scales with severity (see §10.5)."""
-    k = max(3, int(round(severity * 30)) | 1)     # odd kernel length
+    """Linear motion blur; kernel length scales with image size and severity."""
+    reach = 0.025 * max(img.shape[0], img.shape[1])   # blur length ∝ resolution
+    k = int(round(severity * reach)) | 1              # odd kernel length
+    k = max(3, min(81, k))
     kernel = np.zeros((k, k), np.float32)
     kernel[k // 2, :] = 1.0
     M = cv2.getRotationMatrix2D((k / 2 - 0.5, k / 2 - 0.5), angle_deg, 1.0)
@@ -90,14 +92,27 @@ def overexposure(img: np.ndarray, severity: float) -> np.ndarray:
 
 
 def backscatter(img: np.ndarray, severity: float) -> np.ndarray:
-    """"Marine snow": sparse bright particulates."""
+    """Illumination backscatter: a contrast-killing veiling glow (brightest where
+    the light points) plus sparse bright particulates ("marine snow"). This is
+    physically distinct from sensor ``gaussian_noise`` — the veil is the signature.
+    """
     out = _f32(img).copy()
     h, w = img.shape[:2]
-    n = int(severity * 0.004 * h * w)             # particle count
-    ys = np.random.randint(0, h, n)
-    xs = np.random.randint(0, w, n)
-    for y, x in zip(ys, xs):
-        cv2.circle(out, (int(x), int(y)), np.random.randint(1, 3), (255, 255, 255), -1)
+
+    # Veiling glow: blend toward a blue-green-grey light, strongest at the centre.
+    yy, xx = np.mgrid[0:h, 0:w]
+    r = np.sqrt(((xx - w * 0.5) / w) ** 2 + ((yy - h * 0.5) / h) ** 2)
+    veil = (0.65 * severity) * (1.0 - np.clip(r / 0.75, 0.0, 1.0))[..., None]
+    glow = np.array([155, 170, 168], np.float32)
+    out = out * (1.0 - veil) + glow[None, None, :] * veil
+
+    # Sparse bright particles (far fewer than a noise field).
+    n = int(severity * 0.0012 * h * w)
+    if n:
+        ys = np.random.randint(0, h, n)
+        xs = np.random.randint(0, w, n)
+        for y, x in zip(ys, xs):
+            cv2.circle(out, (int(x), int(y)), int(np.random.randint(1, 3)), (245, 245, 245), -1)
     return _u8(out)
 
 
@@ -152,7 +167,8 @@ def _blobby_alpha(h: int, w: int, coverage: float,
         return np.zeros((h, w), np.float32)
     thr = float(np.quantile(sel, 1.0 - coverage))
     span = (field.max() - thr) or 1.0
-    alpha = np.clip((field - thr) / span, 0.0, 1.0)
+    edge = 0.18 * span                                # thin soft edge -> opaque interior
+    alpha = np.clip((field - thr) / edge, 0.0, 1.0)
     if region is not None:
         soft = cv2.GaussianBlur((region > 0).astype(np.float32), (0, 0),
                                 sigmaX=max(h, w) / 120.0)
