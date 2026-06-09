@@ -35,10 +35,12 @@ runs/
 
 # ─── Results ──────────────────────────────────────────────────────────────
 # Keep the small, portfolio-worthy artifacts (JSON tables, PNG plots) tracked.
-# Exclude large binaries — host the demo video externally or use git-lfs.
+# Large binaries stay out, EXCEPT the annotated demo videos, which are the
+# headline qualitative result and small enough to ship.
 *.mp4
 *.avi
 *.mov
+!results/inference/*_demo.mp4
 
 # ─── OS / editor cruft ─────────────────────────────────────────────────────
 .DS_Store

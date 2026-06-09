@@ -57,15 +57,41 @@ def _labeled_ts_range(modality: str, cfg: dict):
 
 
 def _find_frames(modality: str, cfg: dict, images_override: str | None,
-                 stride: int, max_frames: int, segment: str = "labeled") -> list[Path]:
+                 stride: int, max_frames: int, segment: str = "labeled",
+                 frames_source: str = "continuous") -> list[Path]:
     from src.data.loaders import (RGB_DIR, SONAR_DIRS, SONAR_IMG_SUBDIR,
                                   ULTRALYTICS_IMG_EXTS, _parse_timestamp,
                                   discover_chunks, _sorted_by_timestamp)
+    exts = (".pbm", *ULTRALYTICS_IMG_EXTS)
 
     if images_override:
         d = Path(images_override)
-        frames = [p for p in d.glob("*") if p.suffix.lower() in (".pbm", *ULTRALYTICS_IMG_EXTS)]
+        frames = [p for p in d.glob("*") if p.suffix.lower() in exts]
         return _sorted_by_timestamp(frames)[::max(1, stride)][:max_frames]
+
+    if frames_source == "labeled":
+        # Only frames that actually contain the pipe (the annotated ones), so
+        # every rendered frame shows a real detection. Useful for RGB, where the
+        # downward camera only intermittently has the pipe in view and continuous
+        # footage is mostly open water.
+        out_base = REPO_ROOT / cfg["data"].get("prep", {}).get("out_dir", "data/subpipe/yolo")
+        subdir = MODELS[modality]["cfg"]
+        frames = []
+        for split in ("train", "val"):
+            img_d = out_base / subdir / "images" / split
+            lbl_d = out_base / subdir / "labels" / split
+            if not img_d.is_dir():
+                continue
+            for p in img_d.glob("*"):
+                if p.suffix.lower() not in exts:
+                    continue
+                lf = lbl_d / f"{p.stem}.txt"
+                if lf.exists() and lf.read_text(encoding="utf-8").strip():
+                    frames.append(p)
+        frames = _sorted_by_timestamp(frames)
+        if stride > 1:
+            frames = frames[::stride]
+        return frames[:max_frames]
 
     root = REPO_ROOT / cfg["data"][MODELS[modality]["root"]]
     frames = []
@@ -152,6 +178,7 @@ def _compose(frame_bgr, banner, width: int):
 def render_demo(modality: str, cfg: dict, *, max_frames: int, stride: int, fps: float,
                 width: int, images_override: str | None = None, backend: str = "pytorch",
                 segment: str = "labeled", fps_source: str = "measured",
+                frames_source: str = "continuous",
                 model=None, ov=None) -> Path:
     import cv2
     from src.viz import overlay as ov_mod
@@ -172,7 +199,7 @@ def render_demo(modality: str, cfg: dict, *, max_frames: int, stride: int, fps: 
             model = SonarDetector(str(REPO_ROOT / mcfg["weights"]), backend=backend,
                                   conf=mcfg.get("conf", 0.25), iou=mcfg.get("iou", 0.5), imgsz=imgsz)
 
-    frames = _find_frames(modality, cfg, images_override, stride, max_frames, segment)
+    frames = _find_frames(modality, cfg, images_override, stride, max_frames, segment, frames_source)
     if not frames:
         raise FileNotFoundError(
             f"no {modality} frames found (looked under data.{spec['root']}); "
@@ -247,12 +274,16 @@ def main() -> None:
     ap.add_argument("--backend", default="pytorch", choices=["pytorch", "onnx", "engine", "trt"])
     ap.add_argument("--segment", default="labeled", choices=["labeled", "full"],
                     help="'labeled' opens on the inspection window; 'full' uses the whole run")
+    ap.add_argument("--frames", default="continuous", choices=["continuous", "labeled"],
+                    help="'continuous' = raw footage (default); 'labeled' = only pipe-present "
+                         "annotated frames, so every frame shows a detection")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
     render_demo(args.modality, cfg, max_frames=args.max_frames, stride=args.stride,
                 fps=args.fps, width=args.width, images_override=args.images,
-                backend=args.backend, segment=args.segment, fps_source=args.fps_source)
+                backend=args.backend, segment=args.segment, fps_source=args.fps_source,
+                frames_source=args.frames)
 
 
 if __name__ == "__main__":
