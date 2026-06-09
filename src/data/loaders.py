@@ -74,15 +74,22 @@ class Frame:
 def _parse_timestamp(stem: str) -> float:
     """Best-effort parse of a SubPipe filename stem into a float timestamp.
 
-    Filenames are timestamps (e.g. ``1623241234.567.jpg``). If a stem is not a
-    bare number we extract the first numeric run; callers that need a strict
-    ordering fall back to enumeration when this returns NaN.
+    Bare timestamps (``1623241234.567``) parse directly. Prepared frames carry a
+    sensor/chunk prefix (``c0_1623241234.567``); for those we take the *longest*
+    numeric run, which is the timestamp, rather than the leading ``0`` in ``c0``.
+    Returns NaN when no number is present so callers can fall back to enumeration.
     """
     try:
         return float(stem)
     except ValueError:
-        m = re.search(r"[-+]?\d*\.?\d+", stem)
-        return float(m.group()) if m else float("nan")
+        pass
+    nums = re.findall(r"\d+\.\d+|\d+", stem)
+    if not nums:
+        return float("nan")
+    try:
+        return float(max(nums, key=len))
+    except ValueError:
+        return float("nan")
 
 
 def discover_chunks(root: str | Path) -> list[Path]:
