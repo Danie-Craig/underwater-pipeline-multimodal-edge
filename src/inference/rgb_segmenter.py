@@ -98,6 +98,8 @@ class RGBSegmenter:
         """
         import time
 
+        import cv2
+
         if self.backend == "trt":
             t0 = time.perf_counter()
             raw = self._model.infer(frame)
@@ -124,9 +126,21 @@ class RGBSegmenter:
         centroid = (0.5 * (x1 + x2), 0.5 * (y1 + y2))
 
         mask = None
-        if masks is not None and masks.data is not None and len(masks.data):
-            m = masks.data.cpu().numpy()
-            mask = (m.sum(axis=0) > 0).astype(np.uint8)   # union → single pipe mask
+        H, W = frame.shape[:2]
+        if masks is not None:
+            polys = getattr(masks, "xy", None)
+            if polys:
+                # Ultralytics gives polygons in original-image pixels; rasterize
+                # them into one frame-resolution union mask so the mask and the
+                # centroid share the same (frame) coordinate system.
+                mask = np.zeros((H, W), dtype=np.uint8)
+                for poly in polys:
+                    if poly is not None and len(poly) >= 3:
+                        cv2.fillPoly(mask, [np.asarray(poly, dtype=np.int32)], 1)
+            elif masks.data is not None and len(masks.data):
+                # Fallback: upsample the model-resolution union to the frame.
+                m = (masks.data.cpu().numpy().sum(axis=0) > 0).astype(np.uint8)
+                mask = cv2.resize(m, (W, H), interpolation=cv2.INTER_NEAREST)
 
         return SegResult(present=True, score=score, mask=mask,
                          centroid=centroid, latency_ms=dt)
