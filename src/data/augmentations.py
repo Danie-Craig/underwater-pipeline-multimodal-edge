@@ -62,11 +62,28 @@ def low_light(img: np.ndarray, severity: float) -> np.ndarray:
     return _u8(out)
 
 
-def motion_blur(img: np.ndarray, severity: float, angle_deg: float = 0.0) -> np.ndarray:
-    """Linear motion blur; kernel length scales with image size and severity."""
-    reach = 0.025 * max(img.shape[0], img.shape[1])   # blur length ∝ resolution
-    k = int(round(severity * reach)) | 1              # odd kernel length
-    k = max(3, min(81, k))
+def motion_blur(img: np.ndarray, severity: float, angle_deg: float = 0.0,
+                reach_frac: float = 0.05) -> np.ndarray:
+    """Linear motion blur; length scales with image size and severity.
+
+    The kernel length is ``severity * reach_frac * max(H, W)``. RGB motion_blur
+    uses the default (longer) reach so the blur reads clearly even on a large,
+    solid pipe that is otherwise robust to it; sonar motion_smear passes a
+    shorter reach because the acoustic return is far more fragile to smear, so a
+    gentler kernel already drives a real failure. Both directions used
+    (horizontal for RGB, vertical for the sonar along-track smear) are a fast
+    separable box average, so the kernel grows with severity without a cap and
+    distinct severities stay distinct.
+    """
+    reach = reach_frac * max(img.shape[0], img.shape[1])
+    k = max(3, int(round(severity * reach)))
+    a = angle_deg % 180
+    if a == 0:                                    # horizontal motion
+        return cv2.blur(img, (k, 1))
+    if a == 90:                                   # vertical (along-track) motion
+        return cv2.blur(img, (1, k))
+    # Arbitrary angle: rotated line kernel (bounded; not used by the sweep).
+    k = min(k, 81) | 1
     kernel = np.zeros((k, k), np.float32)
     kernel[k // 2, :] = 1.0
     M = cv2.getRotationMatrix2D((k / 2 - 0.5, k / 2 - 0.5), angle_deg, 1.0)
@@ -192,7 +209,7 @@ def sand_occlusion(img: np.ndarray, severity: float,
 
     if mask is not None and int(np.count_nonzero(mask)) > 0:
         region = cv2.dilate((mask > 0).astype(np.uint8), np.ones((11, 11), np.uint8))
-        coverage = sev                                   # fraction of the pipe to bury
+        coverage = sev ** 1.5                            # gentle ramp: light dusting low, full burial at 1.0
     else:
         region = None
         coverage = 0.08 + 0.30 * sev                     # frame fraction (pipe unknown)
@@ -240,8 +257,8 @@ def range_falloff(img: np.ndarray, severity: float) -> np.ndarray:
 
 
 def motion_smear(img: np.ndarray, severity: float) -> np.ndarray:
-    """Along-track motion smear (vertical blur)."""
-    return motion_blur(img, severity, angle_deg=90.0)
+    """Along-track motion smear (vertical blur); keeps the original tuned reach."""
+    return motion_blur(img, severity, angle_deg=90.0, reach_frac=0.025)
 
 
 def reverberation_clutter(img: np.ndarray, severity: float) -> np.ndarray:

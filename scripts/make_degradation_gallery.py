@@ -171,6 +171,7 @@ def build_gallery(modality: str, cfg: dict, severity: float, image_override: str
     _, val_lbl = _val_paths(cfg, spec["subdir"])
     crop = _sonar_crop_window(val_lbl / f"{img_path.stem}.txt", W, H) if spec["crop"] else None
     pipe_mask = mask_from_yolo_label(val_lbl / f"{img_path.stem}.txt", W, H)
+    model.infer(clean)   # warm up so the first panel's latency is not a cold start
 
     frames = [("clean", clean)] + \
              [(c.replace("_", " "),
@@ -228,6 +229,8 @@ def build_sample_grid(modality: str, cfg: dict, n_samples: int, severity: float,
         crop = _sonar_crop_window(val_lbl / f"{p.stem}.txt", W, H) if spec["crop"] else None
         pipe_mask = mask_from_yolo_label(val_lbl / f"{p.stem}.txt", W, H)
         loaded.append((p, img, crop, pipe_mask))
+    if loaded:
+        model.infer(loaded[0][1])   # warm up so the first panel's latency is honest
 
     row_labels = ["clean"] + [c.replace("_", " ") for c in conditions]
     n_rows, n_cols = len(row_labels), len(loaded)
@@ -257,6 +260,155 @@ def build_sample_grid(modality: str, cfg: dict, n_samples: int, severity: float,
     return out_path
 
 
+def build_severity_overview(modality: str, cfg: dict, severities: list,
+                            image_override: str | None = None,
+                            model=None, ov=None) -> Path:
+    """One frame, rows = conditions, cols = clean then each severity.
+
+    A single at-a-glance figure showing every condition's full ramp from
+    clean to maximum severity, with the model output overlaid on each cell.
+    """
+    import cv2
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from src.data.augmentations import DegradationPipeline, mask_from_yolo_label
+    if ov is None:
+        from src.viz import overlay as ov
+    if model is None:
+        model = _load_model(modality, cfg)
+
+    spec = MODELS[modality]
+    conditions = cfg["robustness"][spec["conditions_key"]]
+    degrader = DegradationPipeline(modality)
+
+    img_path = (Path(image_override) if image_override
+                else _pick_spread(_labeled_val_images(cfg, spec["subdir"]), 1)[0])
+    clean = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+    if clean is None:
+        raise FileNotFoundError(f"could not read image {img_path}")
+    H, W = clean.shape[:2]
+    _, val_lbl = _val_paths(cfg, spec["subdir"])
+    crop = _sonar_crop_window(val_lbl / f"{img_path.stem}.txt", W, H) if spec["crop"] else None
+    pipe_mask = mask_from_yolo_label(val_lbl / f"{img_path.stem}.txt", W, H)
+    model.infer(clean)   # warm up so no cell shows a cold-start latency
+
+    # clean rendered once and reused down column 0 as a per-row baseline
+    clean_img, _, clean_present = _annotate(model, modality, clean, crop, ov)
+    clean_rgb = cv2.cvtColor(clean_img, cv2.COLOR_BGR2RGB)
+
+    col_labels = ["clean"] + [f"sev {s}" for s in severities]
+    n_rows, n_cols = len(conditions), len(col_labels)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.0, n_rows * 2.2))
+    axes = np.array(axes).reshape(n_rows, n_cols)
+
+    for r, cond in enumerate(conditions):
+        for c in range(n_cols):
+            ax = axes[r][c]
+            title = col_labels[c] if r == 0 else None
+            ylabel = cond.replace("_", " ") if c == 0 else None
+            if c == 0:
+                _style_axis(ax, clean_rgb, present=clean_present, title=title, ylabel=ylabel)
+                continue
+            sev = severities[c - 1]
+            frame = degrader.apply(clean, cond, sev,
+                                   mask=pipe_mask if cond == "sand_occlusion" else None)
+            img, _, present = _annotate(model, modality, frame, crop, ov)
+            _style_axis(ax, cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
+                        present=present, title=title)
+
+    fig.suptitle(f"{modality.upper()} \u2014 severity sweep per condition "
+                 f"(rows = condition, cols = severity, sample frame: {img_path.name})",
+                 fontsize=13)
+    fig.tight_layout(rect=[0.14, 0, 1, 0.97])
+    out_path = REPO_ROOT / "results" / "robustness" / f"{modality}_severity_overview.png"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
+    print(f"[overview] {modality}: wrote {out_path}  "
+          f"({n_rows} conditions x {len(severities)} severities)")
+    return out_path
+
+
+def build_condition_severity_grids(modality: str, cfg: dict, n_samples: int,
+                                   severities: list, model=None, ov=None) -> list:
+    """One grid file per condition: rows = clean then each severity, cols = samples.
+
+    The detailed view: each condition's ramp shown across several frames so the
+    progression is visible with frame-to-frame variety, not just a single sample.
+    """
+    import cv2
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from src.data.augmentations import DegradationPipeline, mask_from_yolo_label
+    if ov is None:
+        from src.viz import overlay as ov
+    if model is None:
+        model = _load_model(modality, cfg)
+
+    spec = MODELS[modality]
+    conditions = cfg["robustness"][spec["conditions_key"]]
+    degrader = DegradationPipeline(modality)
+    _, val_lbl = _val_paths(cfg, spec["subdir"])
+
+    samples = _pick_spread(_labeled_val_images(cfg, spec["subdir"]), n_samples)
+    loaded = []
+    for p in samples:
+        img = cv2.imread(str(p), cv2.IMREAD_COLOR)
+        if img is None:
+            continue
+        H, W = img.shape[:2]
+        crop = _sonar_crop_window(val_lbl / f"{p.stem}.txt", W, H) if spec["crop"] else None
+        pipe_mask = mask_from_yolo_label(val_lbl / f"{p.stem}.txt", W, H)
+        loaded.append((p, img, crop, pipe_mask))
+    if not loaded:
+        raise FileNotFoundError("no readable val frames for severity grids")
+    model.infer(loaded[0][1])   # warm up
+
+    # clean row rendered once per sample, reused in every condition's grid
+    clean_cells = []
+    for (p, clean, crop, pipe_mask) in loaded:
+        img, _, present = _annotate(model, modality, clean, crop, ov)
+        clean_cells.append((cv2.cvtColor(img, cv2.COLOR_BGR2RGB), present))
+
+    row_labels = ["clean"] + [f"sev {s}" for s in severities]
+    n_rows, n_cols = len(row_labels), len(loaded)
+    out_dir = REPO_ROOT / "results" / "robustness"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+
+    for cond in conditions:
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.4, n_rows * 2.4))
+        axes = np.array(axes).reshape(n_rows, n_cols)
+        for c, (p, clean, crop, pipe_mask) in enumerate(loaded):
+            for r, label in enumerate(row_labels):
+                ax = axes[r][c]
+                ylabel = label if c == 0 else None
+                if r == 0:
+                    rgb, present = clean_cells[c]
+                    _style_axis(ax, rgb, present=present,
+                                title=(f"sample {c + 1}"), ylabel=ylabel)
+                    continue
+                sev = severities[r - 1]
+                frame = degrader.apply(clean, cond, sev,
+                                       mask=pipe_mask if cond == "sand_occlusion" else None)
+                img, _, present = _annotate(model, modality, frame, crop, ov)
+                _style_axis(ax, cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
+                            present=present, ylabel=ylabel)
+        fig.suptitle(f"{modality.upper()} \u2014 {cond.replace('_', ' ')} "
+                     f"(rows = severity, cols = sample frames)", fontsize=13)
+        fig.tight_layout(rect=[0.12, 0, 1, 0.97])
+        out_path = out_dir / f"{modality}_{cond}_severity.png"
+        fig.savefig(out_path, dpi=120)
+        plt.close(fig)
+        written.append(out_path)
+        print(f"[sev-grid] {modality}/{cond}: wrote {out_path}")
+    return written
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Degradation galleries with model output overlaid.")
     ap.add_argument("--config", default="configs/model_config.yaml")
@@ -266,9 +418,16 @@ def main() -> None:
                     help="frames in the multi-sample grid (>1 enables it)")
     ap.add_argument("--image", default=None, help="override the single-gallery sample frame")
     ap.add_argument("--out", default=None, help="single-gallery output PNG (one modality only)")
+    ap.add_argument("--no-overview", action="store_true",
+                    help="skip the per-condition severity-sweep overview figure")
+    ap.add_argument("--overview-image", default=None,
+                    help="override the frame used in the severity overview")
+    ap.add_argument("--per-condition", action="store_true",
+                    help="also write one detailed grid per condition (severity rows x sample cols)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
+    severities = list(cfg["robustness"]["severities"])
     selection = ["rgb", "sonar"] if args.modality == "both" else [args.modality]
     from src.viz import overlay as ov
     for name in selection:
@@ -278,6 +437,12 @@ def main() -> None:
         if args.samples and args.samples > 1:
             build_sample_grid(name, cfg, n_samples=args.samples, severity=args.severity,
                               model=model, ov=ov)
+        if not args.no_overview:
+            build_severity_overview(name, cfg, severities=severities,
+                                    image_override=args.overview_image, model=model, ov=ov)
+        if args.per_condition:
+            build_condition_severity_grids(name, cfg, n_samples=max(args.samples, 3),
+                                           severities=severities, model=model, ov=ov)
 
 
 if __name__ == "__main__":
