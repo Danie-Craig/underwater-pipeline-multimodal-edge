@@ -1,0 +1,65 @@
+{
+  "sequence": "/home/ubuntu/underwater-pipeline-multimodal-edge/data/subpipe/SubPipe/DATA/Chunk3",
+  "fps": 5.0,
+  "duration_s": 28.0,
+  "schedule": {
+    "rgb": [
+      14.0,
+      26.6,
+      "turbidity_haze",
+      1.0
+    ],
+    "sonar": [
+      1.4,
+      14.0,
+      "motion_smear",
+      1.0
+    ]
+  },
+  "clean": {
+    "rgb_only": {
+      "uptime_pct": 100.0,
+      "longest_lost_s": 0.0,
+      "rgb_updates": 76,
+      "sonar_updates": 0,
+      "ticks": 134
+    },
+    "sonar_only": {
+      "uptime_pct": 97.8,
+      "longest_lost_s": 0.4,
+      "rgb_updates": 0,
+      "sonar_updates": 109,
+      "ticks": 134
+    },
+    "fused": {
+      "uptime_pct": 100.0,
+      "longest_lost_s": 0.0,
+      "rgb_updates": 76,
+      "sonar_updates": 109,
+      "ticks": 134
+    }
+  },
+  "stress": {
+    "rgb_only": {
+      "uptime_pct": 96.3,
+      "longest_lost_s": 0.9,
+      "rgb_updates": 52,
+      "sonar_updates": 0,
+      "ticks": 134
+    },
+    "sonar_only": {
+      "uptime_pct": 75.4,
+      "longest_lost_s": 6.1,
+      "rgb_updates": 0,
+      "sonar_updates": 59,
+      "ticks": 134
+    },
+    "fused": {
+      "uptime_pct": 100.0,
+      "longest_lost_s": 0.0,
+      "rgb_updates": 52,
+      "sonar_updates": 59,
+      "ticks": 134
+    }
+  }
+}

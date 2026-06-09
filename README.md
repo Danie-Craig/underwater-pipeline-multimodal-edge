@@ -82,7 +82,7 @@ python scripts/verify_setup.py
 - [x] **3 · Baselines** — train/fine-tune RGB-seg + sonar-det, record clean metrics
 - [x] **4 · Edge optimization** — ONNX → Jetson → TensorRT engine → full benchmark
 - [x] **5 · Robustness** — per-modality degradation sweep + failure analysis
-- [ ] **6 · Fusion** — late/track-level fusion + Kalman; RGB-only vs sonar-only vs fused ablation
+- [x] **6 · Fusion** — late/track-level fusion + Kalman; RGB-only vs sonar-only vs fused ablation
 - [ ] **7 · Mitigations** — aug fine-tuning, frame filtering, cross-modal gating, shutter what-if
 - [ ] **8 · Writeup** — benchmark + robustness tables, fusion ablation, demo video
 
@@ -171,6 +171,88 @@ a hair above the clean baseline at high severity, which is variance, not a real
 gain. And the degradations are synthetic approximations of real optical and
 acoustic failure modes, tuned for plausibility rather than reproduced from field
 data.
+
+## Fusion: holding the track through sensor failures
+
+The fusion stage runs the late-fusion tracker (`src/fusion/late_fusion.py`,
+`kalman_tracker.py`) in three modes (rgb_only, sonar_only, fused) over a real
+survey window and reports pipe-track continuity: the fraction of ticks the track
+stays locked, where "lost" means the Kalman coasted past its limit with no fresh
+measurement. The driver is `scripts/run_fusion_ablation.py`.
+
+### Finding a window both sensors actually see
+
+A track-level fused estimate is only meaningful where both sensors observe the
+pipe at the same time, and that turned out to be the hard part. The camera looks
+straight down; the side-scan sonar looks sideways and is blind in a strip
+directly beneath the vehicle (the nadir gap). The survey was flown in legs, some
+directly over the pipe (camera sees it, sonar does not) and some offset (sonar
+sees it, camera does not), so simultaneous coverage is rare. Neither SubPipeMini
+subset contained any overlap at all, which is why the full SubPipe was needed.
+
+`scripts/find_coobservation.py` walks all five chunks, ranks them by their longest
+run of pipe-visible sonar (from the dataset's own sonar boxes), then verifies a
+chunk by running both models and counting ticks where each clears its fusion gate:
+
+| chunk | sonar pipe-visible | seg masks | both models fire | reading |
+|---|---|---|---|---|
+| Chunk0 | 62.7% | 0 | no | sonar leg, camera barely recording |
+| Chunk1 | 45.7% | 0 | no | camera on, RGB model out of its domain |
+| Chunk2 | 80.7% | 107 | no | pipe in both per ground truth, sonar model misses it |
+| Chunk3 | 15.3% | 0 | yes (~12 s) | the one model-co-observed window |
+| Chunk4 | 64.9% | 0 | no | sonar leg, camera barely recording |
+
+Two honest findings fall out of this. First, genuine co-observation in real
+inspection data is sparse and geometry-driven, which is itself an argument for
+sensor redundancy. Second, part of the limitation is the models, not just the
+sensors: Chunk2's ground truth marks the pipe in both modalities across a
+416-second window, but the sonar model (trained on a different leg) does not
+detect Chunk2's near-nadir sonar, and the RGB model (trained on Chunk2's masks)
+does not generalize to the other legs. Retraining the sonar detector on all five
+chunks would unlock Chunk2 as a multi-minute co-observed window; that is a tracked
+enhancement, not yet run.
+
+### Ablation on the co-observed window (Chunk3, 28 s)
+
+Over Chunk3's co-observed window with two staggered, physically motivated
+degradations (sonar motion smear over the first half, camera turbidity over the
+second), the fused track stays locked throughout while each single sensor drops
+during its own sensor's failure:
+
+| mode | clean | stress (staggered failures) |
+|---|---|---|
+| rgb_only | 100.0% | 96.3% |
+| sonar_only | 97.8% | 75.4% |
+| fused | 100.0% | 100.0% |
+
+The fused estimate carries the track on the camera while the sonar is smeared and
+on the sonar while the camera is degraded, so it beats both single-sensor modes
+under stress. Figure: `results/fusion/fusion_continuity.png`.
+
+### Robustness across every optical failure
+
+`scripts/sweep_fusion_conditions.py` repeats that staggered ablation across all
+eight RGB failure conditions, with the sonar held at its one real failure (motion
+smear). The fused track holds 100% in every case; the camera-only track dips by an
+amount set by how badly each condition hurts the camera, tracking the robustness
+profile above:
+
+| RGB condition under stress | rgb_only | sonar_only | fused |
+|---|---|---|---|
+| color_attenuation / low_light / motion_blur | 100.0% | 75.4% | 100.0% |
+| turbidity_haze | 96.3% | 75.4% | 100.0% |
+| overexposure | 78.4% | 75.4% | 100.0% |
+| gaussian_noise / backscatter / sand_occlusion | 76.9% | 75.4% | 100.0% |
+
+`sonar_only` is constant because its failure is the same in every run; the point
+is that fusion is not just "trust the sonar," since the sonar fails too. Figure:
+`results/fusion/condition_sweep.png`.
+
+Caveats, in the same spirit as the robustness tables: the co-observed window is
+short (28 seconds, about 12 of genuine two-sensor overlap), so the single-sensor
+failures here are real but brief; the degradations are synthetic; and both models
+are specialized to the leg they trained on, which is why this runs on Chunk3
+rather than the longer Chunk2. The sustained version waits on the sonar retrain.
 
 ## Deliverables
 

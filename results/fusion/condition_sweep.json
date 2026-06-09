@@ -1,0 +1,232 @@
+{
+  "sequence": "/home/ubuntu/underwater-pipeline-multimodal-edge/data/subpipe/SubPipe/DATA/Chunk3",
+  "window_s": 28.0,
+  "fps": 5.0,
+  "severity": 1.0,
+  "sonar_condition": "motion_smear",
+  "rgb_window": [
+    0.5,
+    0.95
+  ],
+  "sonar_window": [
+    0.05,
+    0.5
+  ],
+  "clean": {
+    "rgb_only": {
+      "uptime_pct": 100.0,
+      "longest_lost_s": 0.0,
+      "rgb_updates": 76,
+      "sonar_updates": 0,
+      "ticks": 134
+    },
+    "sonar_only": {
+      "uptime_pct": 97.8,
+      "longest_lost_s": 0.4,
+      "rgb_updates": 0,
+      "sonar_updates": 109,
+      "ticks": 134
+    },
+    "fused": {
+      "uptime_pct": 100.0,
+      "longest_lost_s": 0.0,
+      "rgb_updates": 76,
+      "sonar_updates": 109,
+      "ticks": 134
+    }
+  },
+  "stress_by_condition": [
+    {
+      "rgb_condition": "turbidity_haze",
+      "rgb_only": {
+        "uptime_pct": 96.3,
+        "longest_lost_s": 0.9,
+        "rgb_updates": 52,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 52,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "color_attenuation",
+      "rgb_only": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 105,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 105,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "low_light",
+      "rgb_only": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 80,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 80,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "motion_blur",
+      "rgb_only": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 75,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 75,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "gaussian_noise",
+      "rgb_only": {
+        "uptime_pct": 76.9,
+        "longest_lost_s": 6.3,
+        "rgb_updates": 51,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 51,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "overexposure",
+      "rgb_only": {
+        "uptime_pct": 78.4,
+        "longest_lost_s": 5.9,
+        "rgb_updates": 52,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 52,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "backscatter",
+      "rgb_only": {
+        "uptime_pct": 76.9,
+        "longest_lost_s": 6.3,
+        "rgb_updates": 51,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 51,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    },
+    {
+      "rgb_condition": "sand_occlusion",
+      "rgb_only": {
+        "uptime_pct": 76.9,
+        "longest_lost_s": 6.3,
+        "rgb_updates": 51,
+        "sonar_updates": 0,
+        "ticks": 134
+      },
+      "sonar_only": {
+        "uptime_pct": 75.4,
+        "longest_lost_s": 6.1,
+        "rgb_updates": 0,
+        "sonar_updates": 59,
+        "ticks": 134
+      },
+      "fused": {
+        "uptime_pct": 100.0,
+        "longest_lost_s": 0.0,
+        "rgb_updates": 51,
+        "sonar_updates": 59,
+        "ticks": 134
+      }
+    }
+  ]
+}
