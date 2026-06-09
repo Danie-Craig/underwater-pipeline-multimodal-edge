@@ -27,8 +27,8 @@ inference time.
     <th align="center">Side-scan sonar detection</th>
   </tr>
   <tr>
-    <td><video src="results/inference/rgb_demo.mp4" controls width="100%"></video></td>
-    <td><video src="results/inference/sonar_demo.mp4" controls width="100%"></video></td>
+    <td><video src="https://github.com/user-attachments/assets/e7c7b01b-6826-4532-aaee-60688357346e" controls width="100%"></video></td>
+    <td><video src="REPLACE_WITH_SONAR_DEMO_URL" controls width="100%"></video></td>
   </tr>
 </table>
 
