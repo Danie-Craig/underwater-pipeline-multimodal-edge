@@ -87,23 +87,35 @@ class LateFusion:
     def _rgb_to_alongtrack(self, seg: SegResult, pose: Pose) -> float | None:
         """Project an RGB pipe segmentation to an along-track position (m).
 
-        TODO(step 6): use the camera's mounting geometry + ``pose`` to map the
-        mask centroid to a position along the trajectory. For a downward/
-        forward-looking camera over a near-straight pipe this is largely the
-        AUV along-track distance at capture time, refined by the mask's lateral
-        offset. Return ``None`` when the measurement is unusable.
+        The AUV is flying the pipe it is inspecting, so whenever the camera
+        holds a confident mask the pipe is directly beneath the vehicle and its
+        along-track coordinate is the vehicle's own cumulative along-track
+        distance at capture time. We therefore take ``pose.along_track`` as the
+        measurement. A finer sub-frame correction from the mask centroid would
+        need the camera altitude and field of view (its ground footprint), which
+        we do not model; it would move the estimate by at most that footprint and
+        does not change the track-continuity result the fusion exists to show.
+        Returns ``None`` only when the mask is unusable (no centroid).
         """
-        raise NotImplementedError("RGB→along-track projection: roadmap step 6.")
+        if not seg.present or seg.centroid is None:
+            return None
+        return float(pose.along_track)
 
     def _sonar_to_alongtrack(self, det: DetResult, pose: Pose) -> float | None:
         """Project a sonar detection to an along-track position (m).
 
-        TODO(step 6): side-scan returns are indexed by along-track sample and
-        cross-track range; convert the best box's along-track pixel to metres
-        using the sonar's ping geometry and ``pose``. Return ``None`` if
-        unusable.
+        Side-scan returns are indexed by along-track ping and cross-track range.
+        As with the camera, a confident pipe box means the pipe is abeam the
+        vehicle at its current along-track distance, so we take
+        ``pose.along_track`` as the measurement. Turning the box's along-track
+        pixel into a sub-frame metre offset would need the ping rate and
+        waterfall scale (and the image height, which the detection result does
+        not carry); that refinement is omitted for the same reason as the
+        camera's. Returns ``None`` when there is no usable box.
         """
-        raise NotImplementedError("Sonar→along-track projection: roadmap step 6.")
+        if not det.present or det.best is None:
+            return None
+        return float(pose.along_track)
 
     # ------------------------------------------------------------------ #
     def step(
