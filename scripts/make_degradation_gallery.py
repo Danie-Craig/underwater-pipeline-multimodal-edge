@@ -152,7 +152,7 @@ def build_gallery(modality: str, cfg: dict, severity: float, image_override: str
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from src.data.augmentations import DegradationPipeline
+    from src.data.augmentations import DegradationPipeline, mask_from_yolo_label
     if ov is None:
         from src.viz import overlay as ov
     if model is None:
@@ -170,9 +170,13 @@ def build_gallery(modality: str, cfg: dict, severity: float, image_override: str
     H, W = clean.shape[:2]
     _, val_lbl = _val_paths(cfg, spec["subdir"])
     crop = _sonar_crop_window(val_lbl / f"{img_path.stem}.txt", W, H) if spec["crop"] else None
+    pipe_mask = mask_from_yolo_label(val_lbl / f"{img_path.stem}.txt", W, H)
 
     frames = [("clean", clean)] + \
-             [(c.replace("_", " "), degrader.apply(clean, c, severity)) for c in conditions]
+             [(c.replace("_", " "),
+               degrader.apply(clean, c, severity,
+                              mask=pipe_mask if c == "sand_occlusion" else None))
+              for c in conditions]
     n, cols = len(frames), 3
     rows = math.ceil(n / cols)
     fig, axes = plt.subplots(rows, cols, figsize=(cols * 4.3, rows * 3.3))
@@ -203,7 +207,7 @@ def build_sample_grid(modality: str, cfg: dict, n_samples: int, severity: float,
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from src.data.augmentations import DegradationPipeline
+    from src.data.augmentations import DegradationPipeline, mask_from_yolo_label
     if ov is None:
         from src.viz import overlay as ov
     if model is None:
@@ -222,17 +226,21 @@ def build_sample_grid(modality: str, cfg: dict, n_samples: int, severity: float,
             continue
         H, W = img.shape[:2]
         crop = _sonar_crop_window(val_lbl / f"{p.stem}.txt", W, H) if spec["crop"] else None
-        loaded.append((p, img, crop))
+        pipe_mask = mask_from_yolo_label(val_lbl / f"{p.stem}.txt", W, H)
+        loaded.append((p, img, crop, pipe_mask))
 
     row_labels = ["clean"] + [c.replace("_", " ") for c in conditions]
     n_rows, n_cols = len(row_labels), len(loaded)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.4, n_rows * 2.4))
     axes = np.array(axes).reshape(n_rows, n_cols)
 
-    for c, (p, clean, crop) in enumerate(loaded):
+    for c, (p, clean, crop, pipe_mask) in enumerate(loaded):
         for r, label in enumerate(row_labels):
             ax = axes[r][c]
-            frame = clean if r == 0 else degrader.apply(clean, conditions[r - 1], severity)
+            cond = conditions[r - 1] if r > 0 else None
+            frame = clean if r == 0 else degrader.apply(
+                clean, cond, severity,
+                mask=pipe_mask if cond == "sand_occlusion" else None)
             img, _, present = _annotate(model, modality, frame, crop, ov)
             _style_axis(ax, cv2.cvtColor(img, cv2.COLOR_BGR2RGB), present=present,
                         title=(f"sample {c + 1}" if r == 0 else None),

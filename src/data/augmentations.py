@@ -18,12 +18,14 @@ Condition names match ``robustness.rgb_conditions`` / ``sonar_conditions`` in
 
 from __future__ import annotations
 
-from typing import Callable
+import inspect
+from pathlib import Path
+from typing import Callable, Optional
 
 import cv2
 import numpy as np
 
-Augmentation = Callable[[np.ndarray, float], np.ndarray]
+Augmentation = Callable[..., np.ndarray]
 
 
 def _f32(img: np.ndarray) -> np.ndarray:
@@ -99,17 +101,98 @@ def backscatter(img: np.ndarray, severity: float) -> np.ndarray:
     return _u8(out)
 
 
-def sand_occlusion(img: np.ndarray, severity: float) -> np.ndarray:
-    """Occlude part of the pipe with a sandy band (covering fraction ∝ severity)."""
-    out = _f32(img).copy()
+def mask_from_yolo_label(label_path, w: int, h: int) -> Optional[np.ndarray]:
+    """Rasterize a YOLO label into a binary pipe mask of shape (h, w).
+
+    Handles both segmentation polygons (class + normalized x1 y1 x2 y2 ...) and
+    detection boxes (class + cx cy bw bh). Returns uint8 {0, 255}, or None when
+    the label file is missing or has no pipe.
+    """
+    p = Path(label_path)
+    if not p.exists():
+        return None
+    mask = np.zeros((h, w), np.uint8)
+    found = False
+    for line in p.read_text(encoding="utf-8").splitlines():
+        vals = line.split()
+        if len(vals) < 5:
+            continue
+        coords = [float(v) for v in vals[1:]]
+        if len(coords) == 4:                              # bbox: cx cy bw bh
+            cx, cy, bw, bh = coords
+            x0, y0 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
+            x1, y1 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
+            cv2.rectangle(mask, (x0, y0), (x1, y1), 255, -1)
+            found = True
+        elif len(coords) >= 6 and len(coords) % 2 == 0:   # polygon
+            pts = np.array(coords, np.float32).reshape(-1, 2)
+            pts[:, 0] *= w
+            pts[:, 1] *= h
+            cv2.fillPoly(mask, [pts.astype(np.int32)], 255)
+            found = True
+    return mask if found else None
+
+
+def _blobby_alpha(h: int, w: int, coverage: float,
+                  region: Optional[np.ndarray]) -> np.ndarray:
+    """Soft-edged irregular coverage map in [0, 1].
+
+    A low-frequency random field thresholded so that ~`coverage` of the pixels
+    (within `region` if given, else the whole frame) are covered, with soft
+    edges so the result looks organic rather than stamped.
+    """
+    coverage = float(np.clip(coverage, 0.0, 1.0))
+    if coverage <= 0.0:
+        return np.zeros((h, w), np.float32)
+    small = np.random.random((max(2, h // 22), max(2, w // 22))).astype(np.float32)
+    field = cv2.resize(small, (w, h), interpolation=cv2.INTER_CUBIC)
+    field = cv2.GaussianBlur(field, (0, 0), sigmaX=max(h, w) / 70.0)
+    sel = field[region > 0] if region is not None else field.ravel()
+    if sel.size == 0:
+        return np.zeros((h, w), np.float32)
+    thr = float(np.quantile(sel, 1.0 - coverage))
+    span = (field.max() - thr) or 1.0
+    alpha = np.clip((field - thr) / span, 0.0, 1.0)
+    if region is not None:
+        soft = cv2.GaussianBlur((region > 0).astype(np.float32), (0, 0),
+                                sigmaX=max(h, w) / 120.0)
+        alpha = alpha * soft
+    return alpha
+
+
+def sand_occlusion(img: np.ndarray, severity: float,
+                   mask: Optional[np.ndarray] = None) -> np.ndarray:
+    """Bury part of the pipe under irregular, textured sand.
+
+    With a pipe `mask`, sand creeps over ~`severity` of the pipe (this is the
+    intended use: it tests detection of a partially buried pipe). Without a
+    mask the location of the pipe is unknown, so it falls back to scattering
+    irregular sandy patches over a fraction of the frame. Either way the patch
+    is textured with soft edges, not a flat block.
+    """
     h, w = img.shape[:2]
-    band = int(severity * 0.5 * h)
-    if band <= 0:
+    out = _f32(img).copy()
+    sev = float(np.clip(severity, 0.0, 1.0))
+
+    if mask is not None and int(np.count_nonzero(mask)) > 0:
+        region = cv2.dilate((mask > 0).astype(np.uint8), np.ones((11, 11), np.uint8))
+        coverage = sev                                   # fraction of the pipe to bury
+    else:
+        region = None
+        coverage = 0.08 + 0.30 * sev                     # frame fraction (pipe unknown)
+
+    alpha = _blobby_alpha(h, w, coverage, region)
+    if float(alpha.max()) <= 0.0:
         return _u8(out)
-    sand = np.array([120, 170, 200], np.float32)  # BGR sandy tone
-    texture = np.random.normal(0, 15, (band, w, 1)).astype(np.float32)
-    y0 = h - band
-    out[y0:h] = np.clip(sand + texture, 0, 255)
+
+    sand = np.array([108, 152, 178], np.float32)         # muted BGR sand tone
+    grain = np.random.normal(0.0, 16.0, (h, w, 1)).astype(np.float32)
+    low2 = np.random.normal(0.0, 20.0, (max(2, h // 30), max(2, w // 30))).astype(np.float32)
+    low = cv2.resize(low2, (w, h), interpolation=cv2.INTER_CUBIC)[..., None]
+    sand_img = np.clip(sand[None, None, :] + grain + low, 0.0, 255.0)
+
+    a = alpha[..., None]
+    out = out * (1.0 - a) + sand_img * a
     return _u8(out)
 
 
@@ -197,7 +280,11 @@ class DegradationPipeline:
     def conditions(self) -> list[str]:
         return list(self.bank)
 
-    def apply(self, img: np.ndarray, condition: str, severity: float) -> np.ndarray:
+    def apply(self, img: np.ndarray, condition: str, severity: float,
+              mask: Optional[np.ndarray] = None) -> np.ndarray:
         if condition not in self.bank:
             raise KeyError(f"unknown {self.modality} condition: {condition!r}")
-        return self.bank[condition](img, float(severity))
+        fn = self.bank[condition]
+        if "mask" in inspect.signature(fn).parameters:
+            return fn(img, float(severity), mask=mask)
+        return fn(img, float(severity))

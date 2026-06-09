@@ -67,7 +67,7 @@ def degrade_val_set(images_dir: Path, labels_dir: Path, modality: str,
     clean baseline). Labels are always copied verbatim so the geometry matches.
     """
     import cv2
-    from src.data.augmentations import DegradationPipeline
+    from src.data.augmentations import DegradationPipeline, mask_from_yolo_label
 
     img_out = out_dir / "images" / "val"
     lbl_out = out_dir / "labels" / "val"
@@ -82,7 +82,13 @@ def degrade_val_set(images_dir: Path, labels_dir: Path, modality: str,
         if img is None:
             continue
         if degrader is not None and severity > 0:
-            img = degrader.apply(img, condition, severity)
+            # sand_occlusion needs the pipe location so it buries the pipe itself,
+            # not an arbitrary band; other conditions ignore the mask.
+            mask = None
+            if condition == "sand_occlusion":
+                h, w = img.shape[:2]
+                mask = mask_from_yolo_label(labels_dir / f"{img_path.stem}.txt", w, h)
+            img = degrader.apply(img, condition, severity, mask=mask)
         cv2.imwrite(str(img_out / f"{img_path.stem}.png"), img)
         lbl = labels_dir / f"{img_path.stem}.txt"
         (lbl_out / f"{img_path.stem}.txt").write_text(
